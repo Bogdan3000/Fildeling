@@ -40,24 +40,25 @@ async def get_upload_page(request: Request, error: str = None):
     return templates.TemplateResponse("upload.html", {"request": request, "files": files, "error": error})
 
 @router.post("/uploadfile/")
-async def upload_file(file: UploadFile = File(...), password: str = Form(None)):
-    original_filename = file.filename
-    random_filename = str(uuid.uuid4())
-    file_location = os.path.join(UPLOAD_FOLDER, random_filename)
+async def upload_file(files: list[UploadFile] = File(...), password: str = Form(None)):
+    for file in files:
+        original_filename = file.filename
+        random_filename = str(uuid.uuid4())
+        file_location = os.path.join(UPLOAD_FOLDER, random_filename)
 
-    with open(file_location, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+        with open(file_location, "wb") as f:
+            shutil.copyfileobj(file.file, f)
 
-    # Store the password if provided
-    if password:
-        file_passwords[random_filename] = password
-        with open(PASSWORDS_FILE, "w") as f:
-            json.dump(file_passwords, f)
+        # Store the password if provided
+        if password:
+            file_passwords[random_filename] = password
+            with open(PASSWORDS_FILE, "w") as f:
+                json.dump(file_passwords, f)
 
-    # Store the original filename mapping
-    filenames_mapping[random_filename] = original_filename
-    with open(FILENAMES_FILE, "w") as f:
-        json.dump(filenames_mapping, f)
+        # Store the original filename mapping
+        filenames_mapping[random_filename] = original_filename
+        with open(FILENAMES_FILE, "w") as f:
+            json.dump(filenames_mapping, f)
 
     # Redirect to the main page after upload
     return RedirectResponse(url="/", status_code=303)
