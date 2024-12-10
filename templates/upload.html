@@ -4,121 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Upload and Download</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-        }
-        h1 {
-            color: #333;
-        }
-        form {
-            margin: 20px 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        input[type="file"], input[type="password"], input[type="submit"] {
-            margin: 10px 0;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            width: 300px;
-        }
-        input[type="submit"] {
-            background-color: #28a745;
-            color: white;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        input[type="submit"]:hover {
-            background-color: #218838;
-        }
-        table {
-            width: 80%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            background-color: white;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        th, td {
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        a {
-            color: #007bff;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        .error {
-            color: red;
-            margin-top: 20px;
-        }
-        .delete-form {
-            display: inline;
-        }
-        .delete-form button {
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        .delete-form button:hover {
-            background-color: #c82333;
-        }
-        /* Всплывающее окно */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0, 0, 0, 0.4);
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 300px;
-            border-radius: 10px;
-            text-align: center;
-        }
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-        }
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
-        }
-    </style>
+    <link rel="stylesheet" href="https://bohdan.lol/glitch.css">
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>File Upload and Download</h1>
+    <span class="glitch layers" data-text="File Sharing"><span>File Sharing</span></span>
 
     <!-- File upload form -->
     <form id="uploadForm" action="/uploadfile/" enctype="multipart/form-data" method="post">
@@ -158,7 +48,7 @@
     <!-- Всплывающее окно для пароля -->
     <div id="passwordModal" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="closePasswordModal()">×</span>
+            <span class="close" onclick="closePasswordModal()">&times;</span>
             <p>Enter password:</p>
             <input type="password" id="passwordInput" placeholder="Password">
             <button onclick="submitPassword()">Submit</button>
