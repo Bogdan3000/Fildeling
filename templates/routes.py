@@ -17,7 +17,9 @@ templates = Jinja2Templates(directory="templates")
 
 @router.get("/", response_class=HTMLResponse)
 async def get_upload_page(request: Request):
-    return templates.TemplateResponse("upload.html", {"request": request})
+    # Считываем список файлов в директории
+    files = os.listdir(UPLOAD_FOLDER)
+    return templates.TemplateResponse("upload.html", {"request": request, "files": files})
 
 
 @router.post("/uploadfile/")

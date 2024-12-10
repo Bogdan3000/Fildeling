@@ -12,5 +12,14 @@
         <input type="file" id="file" name="file" required><br><br>
         <button type="submit">Upload File</button>
     </form>
+
+    <h2>Uploaded Files</h2>
+    <ul>
+        {% for file in files %}
+            <li>
+                <a href="/uploads/{{ file }}" target="_blank">{{ file }}</a>
+            </li>
+        {% endfor %}
+    </ul>
 </body>
 </html>
