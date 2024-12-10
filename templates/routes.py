@@ -1,13 +1,31 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, File, UploadFile
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
+import shutil
+import os
 
 router = APIRouter()
 
-@router.get("/")
-async def root():
-    """Корневой маршрут."""
-    return {"message": "Hello World"}
+# Папка для хранения загруженных файлов
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-@router.get("/hello/{name}")
-async def say_hello(name: str):
-    """Приветствие по имени."""
-    return {"message": f"Hello {name}"}
+# Настройка шаблонов
+templates = Jinja2Templates(directory="templates")
+
+
+@router.get("/", response_class=HTMLResponse)
+async def get_upload_page(request: Request):
+    return templates.TemplateResponse("upload.html", {"request": request})
+
+
+@router.post("/uploadfile/")
+async def upload_file(file: UploadFile = File(...)):
+    file_location = os.path.join(UPLOAD_FOLDER, file.filename)
+
+    # Сохраняем файл на сервере
+    with open(file_location, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    return {"filename": file.filename, "location": file_location}
