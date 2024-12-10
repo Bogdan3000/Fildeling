@@ -67,16 +67,14 @@ async def delete_file(request: Request, filename: str = Form(...), password: str
     # Find the random filename from the original filename
     random_filename = next((k for k, v in filenames_mapping.items() if v == filename), None)
     if not random_filename:
-        raise HTTPException(status_code=404, detail="File not found")
+        return RedirectResponse(url="/?error=File+not+found", status_code=303)
 
     file_location = os.path.join(UPLOAD_FOLDER, random_filename)
 
     # Check password if it exists
     if random_filename in file_passwords:
         if file_passwords[random_filename] != password:
-            error_message = "Incorrect password"
-            files = [filenames_mapping.get(f, f) for f in os.listdir(UPLOAD_FOLDER)]
-            return templates.TemplateResponse("upload.html", {"request": request, "files": files, "error": error_message})
+            return RedirectResponse(url="/?error=Incorrect+password", status_code=303)
 
     # Delete the file
     os.remove(file_location)
