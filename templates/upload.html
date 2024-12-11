@@ -3,49 +3,193 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File Upload and Download</title>
+    <title>File Sharing</title>
     <link rel="stylesheet" href="https://bohdan.lol/glitch.css">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.0/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .glitch.layers {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 32px;
+            font-weight: bold;
+            color: #000;
+            z-index: 10;
+        }
+        .upload-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+            z-index: 1000;
+        }
+        .upload-button:hover {
+            transform: scale(1.1);
+        }
+        .upload-button i {
+            font-size: 24px;
+        }
+        .file-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            padding: 20px;
+            margin-top: 100px;
+            width: 100%;
+        }
+        .file-card {
+            width: 150px;
+            height: 150px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            transition: transform 0.2s;
+        }
+        .file-card:hover {
+            transform: translateY(-5px);
+        }
+        .file-card i {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+        .file-card img {
+            max-width: 100%;
+            max-height: 80px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        .file-card .delete-button {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: #dc3545;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+            z-index: 20; /* Повышаем приоритет */
+        }
+        .file-card .delete-button i {
+            font-size: 18px; /* Уменьшаем размер иконки */
+            color: white; /* Белый цвет иконки */
+            margin-top: 10px;
+        }
+        .file-card .delete-button:hover {
+            transform: scale(1.2); /* Немного увеличиваем при наведении */
+        }
+        .file-card a {
+            text-decoration: none;
+            color: #007bff;
+            font-size: 14px;
+            word-wrap: break-word;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 300px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: black;
+        }
+    </style>
 </head>
 <body>
     <span class="glitch layers" data-text="File Sharing"><span>File Sharing</span></span>
 
-    <!-- File upload form -->
-    <form id="uploadForm" action="/uploadfile/" enctype="multipart/form-data" method="post">
-        <input name="files" type="file" multiple required>
-        <button type="button" onclick="showPasswordModal('upload')">Upload</button>
+    <!-- Upload button -->
+    <button class="upload-button" onclick="document.getElementById('uploadInput').click();">
+        <i class="fas fa-cloud-upload-alt"></i>
+    </button>
+
+    <!-- File upload hidden input -->
+    <form id="uploadForm" action="/uploadfile/" enctype="multipart/form-data" method="post" style="display: none;">
+        <input id="uploadInput" name="files" type="file" multiple required onchange="submitUploadForm()">
+        <input type="hidden" name="password" id="uploadPassword">
     </form>
 
-    <!-- List of files in a table -->
-    <h2>Files:</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>File Name</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for file in files %}
-            <tr>
-                <td>{{ file.name }}</td>
-                <td>
-                    <a href="/download/{{ file.name }}">Download</a>
-                    <form action="/deletefile/" method="post" class="delete-form">
-                        <input type="hidden" name="filename" value="{{ file.name }}">
-                        <button type="button" onclick="showPasswordModal('delete', '{{ file.name }}')">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <!-- File grid -->
+    <div class="file-grid">
+        {% for file in files %}
+        <div class="file-card">
+            {% if file.name.split('.')[-1] in ["jpg", "jpeg", "png", "gif"] %}
+            <img src="/uploads/{{ file.server_name }}" alt="{{ file.name }}" onclick="showImageModal('/uploads/{{ file.server_name }}')">
+            {% elif file.name.split('.')[-1] in ["mp4", "webm", "ogg"] %}
+            <i class="fas fa-video"></i>
+            {% elif file.name.split('.')[-1] in ["zip", "rar", "7z"] %}
+            <i class="fas fa-file-archive"></i>
+            {% elif file.name.split('.')[-1] in ["doc", "docx", "txt"] %}
+            <i class="fas fa-file-word"></i>
+            {% else %}
+            <i class="fas fa-file"></i>
+            {% endif %}
 
-    {% if error %}
-        <p class="error">{{ error }}</p>
-    {% endif %}
+            <a href="/download/{{ file.name }}">{{ file.name }}</a>
+            <button class="delete-button" onclick="showPasswordModal('{{ file.name }}')">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
 
-    <!-- Всплывающее окно для пароля -->
+    <!-- Password modal -->
     <div id="passwordModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closePasswordModal()">&times;</span>
@@ -55,50 +199,98 @@
         </div>
     </div>
 
-    <script>
-        let currentAction = '';
-        let currentFilename = '';
+    <!-- Image modal -->
+    <div id="imageModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeImageModal()">&times;</span>
+            <img id="modalImage" src="" alt="Preview" style="width: 100%; height: auto;">
+        </div>
+    </div>
 
-        // Показать всплывающее окно для пароля
-        function showPasswordModal(action, filename = '') {
-            currentAction = action;
-            currentFilename = filename;
-            document.getElementById('passwordModal').style.display = 'block';
-        }
 
-        // Закрыть всплывающее окно
-        function closePasswordModal() {
-            document.getElementById('passwordModal').style.display = 'none';
-        }
+<script>
+    function submitUploadForm() {
+        const password = prompt("Enter password (optional):");
+        document.getElementById("uploadPassword").value = password ? password : '';
+        const form = document.getElementById('uploadForm');
+        form.submit();
+    }
 
-        // Отправить пароль
-        function submitPassword() {
-            const password = document.getElementById('passwordInput').value;
-            if (currentAction === 'upload') {
-                const form = document.getElementById('uploadForm');
-                const passwordInput = document.createElement('input');
-                passwordInput.type = 'hidden';
-                passwordInput.name = 'password';
-                passwordInput.value = password;
-                form.appendChild(passwordInput);
-                form.submit();
-            } else if (currentAction === 'delete') {
-                const form = document.querySelector(`.delete-form input[value="${currentFilename}"]`).parentElement;
-                const passwordInput = document.createElement('input');
-                passwordInput.type = 'hidden';
-                passwordInput.name = 'password';
-                passwordInput.value = password;
-                form.appendChild(passwordInput);
-                form.submit();
-            }
-            closePasswordModal();
-        }
+    function showPasswordModal(filename) {
+        currentFilename = filename;
+        document.getElementById('passwordModal').style.display = 'block';
+    }
 
-        // Анимация для строк таблицы
-        document.querySelectorAll('tr').forEach((row, index) => {
-            row.style.transition = `opacity 0.5s ${index * 0.1}s`;
-            row.style.opacity = 1;
-        });
-    </script>
+    function closePasswordModal() {
+        document.getElementById('passwordModal').style.display = 'none';
+    }
+
+    function submitPassword() {
+        const password = document.getElementById('passwordInput').value;
+        const form = document.createElement('form');
+        form.action = '/deletefile/';
+        form.method = 'post';
+
+        const filenameInput = document.createElement('input');
+        filenameInput.type = 'hidden';
+        filenameInput.name = 'filename';
+        filenameInput.value = currentFilename;
+        form.appendChild(filenameInput);
+
+        const passwordInput = document.createElement('input');
+        passwordInput.type = 'hidden';
+        passwordInput.name = 'password';
+        passwordInput.value = password;
+        form.appendChild(passwordInput);
+
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    function showImageModal(src) {
+        const modal = document.getElementById('imageModal');
+        const modalImage = document.getElementById('modalImage');
+        modalImage.src = "/uploads/" + currentFilename;
+        modal.style.display = 'block';
+    }
+
+    function closeImageModal() {
+        const modal = document.getElementById('imageModal');
+        modal.style.display = 'none';
+    }
+    function showDeletePasswordModal(filename) {
+        currentFilename = filename;
+        document.getElementById('deletePasswordModal').style.display = 'block';
+    }
+
+    // Закрытие окна
+    function closeDeletePasswordModal() {
+        document.getElementById('deletePasswordModal').style.display = 'none';
+    }
+
+    // Отправка формы с паролем для удаления
+    function submitDeletePassword() {
+        const password = document.getElementById('deletePasswordInput').value;
+        const form = document.createElement('form');
+        form.action = '/deletefile/';
+        form.method = 'post';
+
+        const filenameInput = document.createElement('input');
+        filenameInput.type = 'hidden';
+        filenameInput.name = 'filename';
+        filenameInput.value = currentFilename;
+        form.appendChild(filenameInput);
+
+        const passwordInput = document.createElement('input');
+        passwordInput.type = 'hidden';
+        passwordInput.name = 'password';
+        passwordInput.value = password;
+        form.appendChild(passwordInput);
+
+        document.body.appendChild(form);
+        form.submit();
+    }
+</script>
+
 </body>
 </html>

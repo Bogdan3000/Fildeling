@@ -32,18 +32,25 @@ else:
 async def get_upload_page(request: Request, error: str = None):
     files = [
         {
-            "name": filenames_mapping.get(f, f),
+            "name": file_info["name"],
+            "server_name": file_info["server_name"],
             "is_protected": f in file_passwords
         }
-        for f in os.listdir(UPLOAD_FOLDER)
+        for f, file_info in filenames_mapping.items()
     ]
-    return templates.TemplateResponse("upload.html", {"request": request, "files": files, "error": error})
+    print(f"Files: {files}")  # Логируем файлы
+    return templates.TemplateResponse("upload.html", {
+        "request": request,
+        "files": files,
+        "filenames_mapping": filenames_mapping,
+        "error": error
+    })
 
 @router.post("/uploadfile/")
 async def upload_file(files: list[UploadFile] = File(...), password: str = Form(None)):
     for file in files:
         original_filename = file.filename
-        random_filename = str(uuid.uuid4())
+        random_filename = str(uuid.uuid4())  # случайное имя файла на сервере
         file_location = os.path.join(UPLOAD_FOLDER, random_filename)
 
         with open(file_location, "wb") as f:
@@ -55,8 +62,11 @@ async def upload_file(files: list[UploadFile] = File(...), password: str = Form(
             with open(PASSWORDS_FILE, "w") as f:
                 json.dump(file_passwords, f)
 
-        # Store the original filename mapping
-        filenames_mapping[random_filename] = original_filename
+        # Store the original filename mapping along with the server name
+        filenames_mapping[random_filename] = {
+            "name": original_filename,
+            "server_name": random_filename
+        }
         with open(FILENAMES_FILE, "w") as f:
             json.dump(filenames_mapping, f)
 
@@ -65,22 +75,31 @@ async def upload_file(files: list[UploadFile] = File(...), password: str = Form(
 
 @router.post("/deletefile/")
 async def delete_file(request: Request, filename: str = Form(...), password: str = Form(None)):
-    # Find the random filename from the original filename
-    random_filename = next((k for k, v in filenames_mapping.items() if v == filename), None)
+    # Find the random filename by the original filename
+    random_filename = next((k for k, v in filenames_mapping.items() if v["name"] == filename), None)
     if not random_filename:
         return RedirectResponse(url="/?error=File+not+found", status_code=303)
 
     file_location = os.path.join(UPLOAD_FOLDER, random_filename)
 
-    # Check password if it exists
+    # Check if the file is protected with a password
     if random_filename in file_passwords:
+        if not password:
+            return templates.TemplateResponse("upload.html", {
+                "request": request,
+                "error": "Password is required to delete this file",
+                "delete_filename": filename
+            })
+
         if file_passwords[random_filename] != password:
             return RedirectResponse(url="/?error=Incorrect+password", status_code=303)
 
-    # Delete the file
+    # Remove the file if password is correct or not required
     os.remove(file_location)
     file_passwords.pop(random_filename, None)
     filenames_mapping.pop(random_filename, None)
+
+    # Save changes to the files
     with open(PASSWORDS_FILE, "w") as f:
         json.dump(file_passwords, f)
     with open(FILENAMES_FILE, "w") as f:
@@ -90,8 +109,8 @@ async def delete_file(request: Request, filename: str = Form(...), password: str
 
 @router.get("/download/{filename}")
 async def download_file(filename: str):
-    # Find the random filename from the original filename
-    random_filename = next((k for k, v in filenames_mapping.items() if v == filename), None)
+    # Find the random filename by the original filename
+    random_filename = next((k for k, v in filenames_mapping.items() if v["name"] == filename), None)
     if not random_filename:
         raise HTTPException(status_code=404, detail="File not found")
 
