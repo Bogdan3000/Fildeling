@@ -28,15 +28,15 @@
             z-index: 10;
         }
         .upload-button {
-            position: fixed;
+            position: absolute;
             top: 20px;
             right: 20px;
             background-color: #007bff;
             color: white;
             border: none;
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
+            border-radius: 10px;
+            width: 100px;
+            height: 50px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -53,11 +53,11 @@
         .file-grid {
             display: flex;
             flex-wrap: wrap;
-            gap: 20px;
+            gap: 25px;
             justify-content: center;
-            padding: 20px;
             margin-top: 100px;
             width: 100%;
+
         }
         .file-card {
             width: 150px;
@@ -80,17 +80,20 @@
             font-size: 36px;
             margin-bottom: 10px;
         }
-        .file-card img {
+
+        .file-card img,
+        .file-card video {
             max-width: 100%;
             max-height: 80px;
             margin-bottom: 10px;
             cursor: pointer;
+            border-radius: 10px;
         }
         .file-card .delete-button {
             position: absolute;
             top: 5px;
             right: 5px;
-            background-color: #dc3545;
+            background-color: #e7e7e7;
             border: none;
             border-radius: 50%;
             width: 30px;
@@ -101,10 +104,16 @@
             cursor: pointer;
             transition: transform 0.2s;
             z-index: 20; /* Повышаем приоритет */
+            opacity: 0; /* Скрываем кнопку по умолчанию */
+            pointer-events: none; /* Делаем кнопку неактивной */
+        }
+        .file-card:hover .delete-button {
+            opacity: 1; /* Показываем кнопку при наведении */
+            pointer-events: auto; /* Делаем кнопку активной */
         }
         .file-card .delete-button i {
             font-size: 18px; /* Уменьшаем размер иконки */
-            color: white; /* Белый цвет иконки */
+            color: black; /* Белый цвет иконки */
             margin-top: 10px;
         }
         .file-card .delete-button:hover {
@@ -114,7 +123,10 @@
             text-decoration: none;
             color: #007bff;
             font-size: 14px;
-            word-wrap: break-word;
+            word-wrap: break-word; /* Перенос текста на новую строку */
+            word-break: break-all; /* Перенос текста на новую строку, даже если слово одно */
+            display: block; /* Делаем ссылку блочным элементом, чтобы текст переносился */
+            max-width: 100%; /* Ограничиваем ширину текста */
         }
         .modal {
             display: none;
@@ -153,13 +165,11 @@
 </head>
 <body>
     <span class="glitch layers" data-text="File Sharing"><span>File Sharing</span></span>
-
     <!-- Upload button -->
     <button class="upload-button" onclick="document.getElementById('uploadInput').click();">
-        <i class="fas fa-cloud-upload-alt"></i>
+        <i class="fa-solid fa-upload"></i>
     </button>
 
-    <!-- File upload hidden input -->
     <form id="uploadForm" action="/uploadfile/" enctype="multipart/form-data" method="post" style="display: none;">
         <input id="uploadInput" name="files" type="file" multiple required onchange="submitUploadForm()">
         <input type="hidden" name="password" id="uploadPassword">
@@ -169,13 +179,16 @@
     <div class="file-grid">
         {% for file in files %}
         <div class="file-card">
-            {% if file.name.split('.')[-1] in ["jpg", "jpeg", "png", "gif"] %}
+            {% if file.name.split('.')[-1] in ["jpg", "jpeg", "png", "gif", "JPG", "JPEG", "PNG", "GIF"] %}
             <img src="/uploads/{{ file.server_name }}" alt="{{ file.name }}" onclick="showImageModal('/uploads/{{ file.server_name }}')">
-            {% elif file.name.split('.')[-1] in ["mp4", "webm", "ogg"] %}
-            <i class="fas fa-video"></i>
-            {% elif file.name.split('.')[-1] in ["zip", "rar", "7z"] %}
+            {% elif file.name.split('.')[-1] in ["mp4", "webm", "mov", "mkv", "MP4", "WEBM", "MOV", "MKV"] %}
+            <video src="/uploads/{{ file.server_name }}" onclick="showVideoModal('/uploads/{{ file.server_name }}')"
+                   controls muted loop autoplay playsinline></video>
+            {% elif file.name.split('.')[-1] in ["zip", "rar", "7z", "ZIP", "RAR", "7Z"] %}
             <i class="fas fa-file-archive"></i>
-            {% elif file.name.split('.')[-1] in ["doc", "docx", "txt"] %}
+            {% elif file.name.split('.')[-1] in ["doc", "docx", "txt", "odt", "DOC", "DOCX", "TXT", "ODT"] %}
+            <i class="fas fa-file-word"></i>
+            {% elif file.name.split('.')[-1] in ["ogg", "wav", "mp3", "m4a" "OGG", "WAV", "MP3", "M4A"] %}
             <i class="fas fa-file-word"></i>
             {% else %}
             <i class="fas fa-file"></i>
@@ -194,7 +207,7 @@
         <div class="modal-content">
             <span class="close" onclick="closePasswordModal()">&times;</span>
             <p>Enter password:</p>
-            <input type="password" id="passwordInput" placeholder="Password">
+            <label for="passwordInput"></label><input type="password" id="passwordInput" placeholder="Password">
             <button onclick="submitPassword()">Submit</button>
         </div>
     </div>
@@ -207,6 +220,13 @@
         </div>
     </div>
 
+    <!-- Video modal -->
+    <div id="videoModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeVideoModal()">&times;</span>
+            <video id="modalVideo" src="" controls autoplay></video>
+        </div>
+    </div>
 
 <script>
     function submitUploadForm() {
@@ -250,7 +270,7 @@
     function showImageModal(src) {
         const modal = document.getElementById('imageModal');
         const modalImage = document.getElementById('modalImage');
-        modalImage.src = "/uploads/" + currentFilename;
+        modalImage.src = src;
         modal.style.display = 'block';
     }
 
@@ -258,37 +278,17 @@
         const modal = document.getElementById('imageModal');
         modal.style.display = 'none';
     }
-    function showDeletePasswordModal(filename) {
-        currentFilename = filename;
-        document.getElementById('deletePasswordModal').style.display = 'block';
+
+    function showVideoModal(src) {
+        const modal = document.getElementById('videoModal');
+        const modalVideo = document.getElementById('modalVideo');
+        modalVideo.src = src;
+        modal.style.display = 'block';
     }
 
-    // Закрытие окна
-    function closeDeletePasswordModal() {
-        document.getElementById('deletePasswordModal').style.display = 'none';
-    }
-
-    // Отправка формы с паролем для удаления
-    function submitDeletePassword() {
-        const password = document.getElementById('deletePasswordInput').value;
-        const form = document.createElement('form');
-        form.action = '/deletefile/';
-        form.method = 'post';
-
-        const filenameInput = document.createElement('input');
-        filenameInput.type = 'hidden';
-        filenameInput.name = 'filename';
-        filenameInput.value = currentFilename;
-        form.appendChild(filenameInput);
-
-        const passwordInput = document.createElement('input');
-        passwordInput.type = 'hidden';
-        passwordInput.name = 'password';
-        passwordInput.value = password;
-        form.appendChild(passwordInput);
-
-        document.body.appendChild(form);
-        form.submit();
+    function closeVideoModal() {
+        const modal = document.getElementById('videoModal');
+        modal.style.display = 'none';
     }
 </script>
 
