@@ -134,10 +134,11 @@ async def github_webhook(request: Request):
             os.chdir('/home/ubuntu/Fildeling')
 
             git_url = f"https://github.com/Bogdan3000/Fildeling.git"
-            subprocess.run(['git', 'pull', git_url])
-
+            a = subprocess.run(['git', 'pull', git_url])
+            print(a.stdout)
             # Перезапуск службы
-            subprocess.run(['systemctl', 'restart', 'bot.service'])
+            a = subprocess.run(['systemctl', 'restart', 'bot.service'])
+            print(a.stdout)
 
         return {"message": "Received"}
     except Exception as e:
