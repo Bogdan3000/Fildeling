@@ -125,19 +125,11 @@ async def download_file(filename: str):
 
 @router.post("/webhook")
 async def github_webhook(request: Request):
-    print(1)
     try:
-        data = await request.json()
-        print(data)
-        # Логика обработки данных репозитория
-        if data and data["ref"] == 'refs/heads/main':
-            os.chdir('/home/ubuntu/Fildeling')
-
-            git_url = f"https://github.com/Bogdan3000/Fildeling.git"
-            a = subprocess.run(['git', 'pull', git_url])
-            # Перезапуск службы
-            a = subprocess.run(['systemctl', 'restart', 'bot.service'])
-
+        os.chdir('/home/ubuntu/Fildeling')
+        git_url = f"https://github.com/Bogdan3000/Fildeling.git"
+        subprocess.run(['git', 'pull', git_url])
+        subprocess.run(['systemctl', 'restart', 'bot.service'])
         return {"message": "Received"}
     except Exception as e:
         return {"error": str(e)}
