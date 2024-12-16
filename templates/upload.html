@@ -180,9 +180,9 @@
         {% for file in files %}
         <div class="file-card">
             {% if file.name.split('.')[-1] in ["jpg", "jpeg", "png", "gif", "JPG", "JPEG", "PNG", "GIF"] %}
-            <img src="/uploads/{{ file.server_name }}" alt="{{ file.name }}" onclick="showImageModal('/uploads/{{ file.server_name }}')">
+            <img src="https://fr7l8ysq4sbm.objectstorage.eu-frankfurt-1.oci.customer-oci.com/n/fr7l8ysq4sbm/b/ShareData/o/{{ file.server_name }}" alt="{{ file.name }}" onclick="showImageModal('https://fr7l8ysq4sbm.objectstorage.eu-frankfurt-1.oci.customer-oci.com/n/fr7l8ysq4sbm/b/ShareData/o/{{ file.server_name }}')">
             {% elif file.name.split('.')[-1] in ["mp4", "webm", "mov", "mkv", "MP4", "WEBM", "MOV", "MKV"] %}
-            <video src="/uploads/{{ file.server_name }}"
+            <video src="https://fr7l8ysq4sbm.objectstorage.eu-frankfurt-1.oci.customer-oci.com/n/fr7l8ysq4sbm/b/ShareData/o/{{ file.server_name }}"
                    controls muted loop autoplay playsinline></video>
             {% elif file.name.split('.')[-1] in ["zip", "rar", "7z", "ZIP", "RAR", "7Z"] %}
             <i class="fas fa-file-archive"></i>

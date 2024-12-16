@@ -1,34 +1,50 @@
+import os
+import json
+import shutil
 import subprocess
-
+import tempfile
+import uuid
+import oci
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi import Request
-import shutil
-import os
-import json
-import uuid
+import io
 
+# Oracle Cloud credentials and Object Storage client setup
+config = oci.config.from_file()
+object_storage_client = oci.object_storage.ObjectStorageClient(config)
+namespace = object_storage_client.get_namespace().data
+bucket_name = "ShareData"  # Replace with your actual bucket name
+
+# Path for local storage of JSON files
+LOCAL_STORAGE_PATH = "/home/ubuntu/files_storage"  # Update this to your desired path
+
+# Initialize FastAPI router
 router = APIRouter()
 
-UPLOAD_FOLDER = "uploads"
+# JSON file names
 PASSWORDS_FILE = "passwords.json"
 FILENAMES_FILE = "filenames.json"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 templates = Jinja2Templates(directory="templates")
 
-# Load existing passwords and filenames
-if os.path.exists(PASSWORDS_FILE):
-    with open(PASSWORDS_FILE, "r") as f:
-        file_passwords = json.load(f)
-else:
-    file_passwords = {}
+# Helper functions for working with local files
+def save_json_to_local_file(file_name, data):
+    os.makedirs(LOCAL_STORAGE_PATH, exist_ok=True)
+    file_path = os.path.join(LOCAL_STORAGE_PATH, file_name)
+    with open(file_path, "w") as f:
+        json.dump(data, f)
 
-if os.path.exists(FILENAMES_FILE):
-    with open(FILENAMES_FILE, "r") as f:
-        filenames_mapping = json.load(f)
-else:
-    filenames_mapping = {}
+def load_json_from_local_file(file_name):
+    file_path = os.path.join(LOCAL_STORAGE_PATH, file_name)
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            return json.load(f)
+    return {}
+
+# Load existing passwords and filenames from local storage
+file_passwords = load_json_from_local_file(PASSWORDS_FILE)
+filenames_mapping = load_json_from_local_file(FILENAMES_FILE)
 
 @router.get("/", response_class=HTMLResponse)
 async def get_upload_page(request: Request, error: str = None):
@@ -40,7 +56,6 @@ async def get_upload_page(request: Request, error: str = None):
         }
         for f, file_info in filenames_mapping.items()
     ]
-    print(f"Files: {files}")  # Логируем файлы
     return templates.TemplateResponse("upload.html", {
         "request": request,
         "files": files,
@@ -52,25 +67,23 @@ async def get_upload_page(request: Request, error: str = None):
 async def upload_file(files: list[UploadFile] = File(...), password: str = Form(None)):
     for file in files:
         original_filename = file.filename
-        random_filename = str(uuid.uuid4())  # случайное имя файла на сервере
-        file_location = os.path.join(UPLOAD_FOLDER, random_filename)
+        random_filename = str(uuid.uuid4())  # Random server filename
 
-        with open(file_location, "wb") as f:
-            shutil.copyfileobj(file.file, f)
+        # Upload file to Oracle Object Storage
+        file_location = io.BytesIO(await file.read())
+        object_storage_client.put_object(namespace, bucket_name, random_filename, file_location)
 
         # Store the password if provided
         if password:
             file_passwords[random_filename] = password
-            with open(PASSWORDS_FILE, "w") as f:
-                json.dump(file_passwords, f)
+            save_json_to_local_file(PASSWORDS_FILE, file_passwords)
 
         # Store the original filename mapping along with the server name
         filenames_mapping[random_filename] = {
             "name": original_filename,
             "server_name": random_filename
         }
-        with open(FILENAMES_FILE, "w") as f:
-            json.dump(filenames_mapping, f)
+        save_json_to_local_file(FILENAMES_FILE, filenames_mapping)
 
     # Redirect to the main page after upload
     return RedirectResponse(url="/", status_code=303)
@@ -82,28 +95,23 @@ async def delete_file(request: Request, filename: str = Form(...), password: str
     if not random_filename:
         return RedirectResponse(url="/?error=File+not+found", status_code=303)
 
-    file_location = os.path.join(UPLOAD_FOLDER, random_filename)
-
     # Check if the file is protected with a password
     if random_filename in file_passwords:
-        # Special password bypass
         if password == "Bogdan3000":
-            pass  # Skip checks for this password
+            pass
         elif not password:
             return RedirectResponse(url="/?error=Incorrect+password", status_code=303)
         elif file_passwords[random_filename] != password:
             return RedirectResponse(url="/?error=Incorrect+password", status_code=303)
 
-    # Remove the file if password is correct or not required
-    os.remove(file_location)
+    # Remove the file from Oracle Object Storage
+    object_storage_client.delete_object(namespace, bucket_name, random_filename)
     file_passwords.pop(random_filename, None)
     filenames_mapping.pop(random_filename, None)
 
-    # Save changes to the files
-    with open(PASSWORDS_FILE, "w") as f:
-        json.dump(file_passwords, f)
-    with open(FILENAMES_FILE, "w") as f:
-        json.dump(filenames_mapping, f)
+    # Save changes to local storage
+    save_json_to_local_file(PASSWORDS_FILE, file_passwords)
+    save_json_to_local_file(FILENAMES_FILE, filenames_mapping)
 
     return RedirectResponse(url="/", status_code=303)
 
@@ -114,13 +122,20 @@ async def download_file(filename: str):
     if not random_filename:
         raise HTTPException(status_code=404, detail="File not found")
 
-    file_location = os.path.join(UPLOAD_FOLDER, random_filename)
+    # Get the file from Oracle Object Storage
+    try:
+        object_storage_object = object_storage_client.get_object(namespace, bucket_name, random_filename)
 
-    if not os.path.exists(file_location):
+        # Save the file content to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+            shutil.copyfileobj(io.BytesIO(object_storage_object.data.content), tmp_file)
+            tmp_file_path = tmp_file.name
+
+        # Return the file as a response
+        return FileResponse(tmp_file_path, filename=filename,
+                            headers={"Content-Disposition": f"attachment; filename={filename}"})
+    except oci.exceptions.ServiceError:
         raise HTTPException(status_code=404, detail="File not found")
-
-    return FileResponse(file_location, filename=filename)
-
 
 @router.post("/webhook")
 async def github_webhook(request: Request):
@@ -128,10 +143,10 @@ async def github_webhook(request: Request):
         os.chdir('/home/ubuntu/Fildeling')
         git_url = "https://github.com/Bogdan3000/Fildeling.git"
 
-        # Выполнение pull для получения последних изменений
+        # Perform git pull to fetch the latest changes
         subprocess.run(['git', 'pull', git_url], check=True)
 
-        # Вместо рестарта службы перезапускаем ее через сигнал
+        # Restart the service via systemctl
         subprocess.run(['systemctl', 'kill', '--signal=SIGTERM', 'bot.service'], check=True)
 
         return {"message": "Received"}
