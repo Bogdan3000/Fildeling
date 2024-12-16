@@ -14,7 +14,7 @@ async def github_webhook(request: Request):
 
         # Логика обработки данных репозитория
         if data and data["ref"] == 'refs/heads/main':
-            os.chdir('/home/ubuntu/fildeling')
+            os.chdir('/home/ubuntu/Fildeling')
 
             git_url = f"https://github.com/Bogdan3000/Fildeling.git"
             subprocess.run(['git', 'pull', git_url])
