@@ -4,8 +4,12 @@ from templates.routes import router
 
 app = FastAPI()
 
-# Подключаем статику для доступа к загруженным файлам
+# Настроим маршруты для статических файлов
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/static", StaticFiles(directory="static"), name="static")
-# Подключаем маршруты из routes.py
+
+# Настроим маршрут для .well-known/acme-challenge/
+app.mount("/.well-known", StaticFiles(directory="/path/to/acme-challenge"), name="acme-challenge")
+
+# Включаем маршруты из другого файла
 app.include_router(router)
