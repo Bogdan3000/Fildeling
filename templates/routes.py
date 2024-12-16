@@ -1,3 +1,5 @@
+import subprocess
+
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
@@ -120,3 +122,23 @@ async def download_file(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(file_location, filename=filename)
+
+@router.post("/webhook")
+async def github_webhook(request: Request):
+    try:
+        # Обработка данных с GitHub
+        data = await request.json()
+
+        # Логика обработки данных репозитория
+        if data and data["ref"] == 'refs/heads/main':
+            os.chdir('/home/ubuntu/Fildeling')
+
+            git_url = f"https://github.com/Bogdan3000/Fildeling.git"
+            subprocess.run(['git', 'pull', git_url])
+
+            # Перезапуск службы
+            subprocess.run(['systemctl', 'restart', 'bot.service'])
+
+        return {"message": "Received"}
+    except Exception as e:
+        return {"error": str(e)}
