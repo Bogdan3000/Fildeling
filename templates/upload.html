@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File Sharing</title>
+    <title>123</title>
     <link rel="stylesheet" href="https://bohdan.lol/glitch.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.0/css/all.min.css">
     <style>
@@ -182,7 +182,7 @@
             {% if file.name.split('.')[-1] in ["jpg", "jpeg", "png", "gif", "JPG", "JPEG", "PNG", "GIF"] %}
             <img src="/uploads/{{ file.server_name }}" alt="{{ file.name }}" onclick="showImageModal('/uploads/{{ file.server_name }}')">
             {% elif file.name.split('.')[-1] in ["mp4", "webm", "mov", "mkv", "MP4", "WEBM", "MOV", "MKV"] %}
-            <video src="/uploads/{{ file.server_name }}" onclick="showVideoModal('/uploads/{{ file.server_name }}')"
+            <video src="/uploads/{{ file.server_name }}"
                    controls muted loop autoplay playsinline></video>
             {% elif file.name.split('.')[-1] in ["zip", "rar", "7z", "ZIP", "RAR", "7Z"] %}
             <i class="fas fa-file-archive"></i>
