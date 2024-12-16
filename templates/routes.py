@@ -123,13 +123,19 @@ async def download_file(filename: str):
 
     return FileResponse(file_location, filename=filename)
 
+
 @router.post("/webhook")
 async def github_webhook(request: Request):
     try:
         os.chdir('/home/ubuntu/Fildeling')
-        git_url = f"https://github.com/Bogdan3000/Fildeling.git"
-        subprocess.run(['git', 'pull', git_url])
-        subprocess.run(['systemctl', 'restart', 'bot.service'])
+        git_url = "https://github.com/Bogdan3000/Fildeling.git"
+
+        # Выполнение pull для получения последних изменений
+        subprocess.run(['git', 'pull', git_url], check=True)
+
+        # Вместо рестарта службы перезапускаем ее через сигнал
+        subprocess.run(['systemctl', 'kill', '--signal=SIGTERM', 'bot.service'], check=True)
+
         return {"message": "Received"}
-    except Exception as e:
-        return {"error": str(e)}
+    except subprocess.CalledProcessError as e:
+        return {"error": f"Error occurred: {e}"}
