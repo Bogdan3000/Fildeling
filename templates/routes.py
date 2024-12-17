@@ -11,7 +11,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi import Request
 import io
-
+import transliterate
+import re
 # Oracle Cloud credentials and Object Storage client setup
 config = oci.config.from_file()
 object_storage_client = oci.object_storage.ObjectStorageClient(config)
@@ -64,12 +65,22 @@ async def get_upload_page(request: Request, error: str = None):
         "error": error
     })
 
+
 @router.post("/uploadfile/")
 async def upload_file(files: list[UploadFile] = File(...), password: str = Form(None)):
     for file in files:
         original_filename = file.filename
+
+        # Преобразование имени файла в латиницу, если требуется
+        if not all(ord(c) < 128 for c in original_filename):
+            if transliterate.detect_language(original_filename) == "ru":
+                original_filename = transliterate.translit(original_filename, reversed=True)
+            else:
+                original_filename = re.sub(r"[^a-zA-Z0-9._-]", "_", original_filename)
+
         # Получение расширения файла
         file_extension = original_filename.split('.')[-1] if '.' in original_filename else ''
+
         # Генерация случайного имени с расширением
         random_filename = f"{uuid.uuid4()}.{file_extension}" if file_extension else str(uuid.uuid4())
 
