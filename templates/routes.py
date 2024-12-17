@@ -5,48 +5,57 @@ import subprocess
 import tempfile
 import urllib
 import uuid
+import io
+import re
 import oci
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi import Request
-import io
 import transliterate
-import re
-# Oracle Cloud credentials and Object Storage client setup
-config = oci.config.from_file()
+
+config_path = "/etc/secrets/config"
+config = oci.config.from_file(file_location=config_path)
 object_storage_client = oci.object_storage.ObjectStorageClient(config)
 namespace = object_storage_client.get_namespace().data
 bucket_name = "ShareData"  # Replace with your actual bucket name
-
-# Path for local storage of JSON files
-LOCAL_STORAGE_PATH = "/home/ubuntu/files_storage"  # Update this to your desired path
-
-# Initialize FastAPI router
-router = APIRouter()
 
 # JSON file names
 PASSWORDS_FILE = "passwords.json"
 FILENAMES_FILE = "filenames.json"
 templates = Jinja2Templates(directory="templates")
 
-# Helper functions for working with local files
-def save_json_to_local_file(file_name, data):
-    os.makedirs(LOCAL_STORAGE_PATH, exist_ok=True)
-    file_path = os.path.join(LOCAL_STORAGE_PATH, file_name)
-    with open(file_path, "w") as f:
-        json.dump(data, f)
+# Helper functions for working with Object Storage
+def save_json_to_object_storage(file_name, data):
+    # Convert JSON data to bytes
+    json_bytes = io.BytesIO(json.dumps(data).encode('utf-8'))
+    # Upload JSON to Object Storage
+    object_storage_client.put_object(namespace, bucket_name, file_name, json_bytes)
 
-def load_json_from_local_file(file_name):
-    file_path = os.path.join(LOCAL_STORAGE_PATH, file_name)
-    if os.path.exists(file_path):
-        with open(file_path, "r") as f:
-            return json.load(f)
-    return {}
+def load_json_from_object_storage(file_name):
+    try:
+        # Fetch the JSON file from Object Storage
+        obj = object_storage_client.get_object(namespace, bucket_name, file_name)
+        # Read and parse the JSON content
+        return json.load(io.BytesIO(obj.data.content))
+    except oci.exceptions.ServiceError as e:
+        if e.status == 404:  # File not found
+            return {}
+        raise e
 
-# Load existing passwords and filenames from local storage
-file_passwords = load_json_from_local_file(PASSWORDS_FILE)
-filenames_mapping = load_json_from_local_file(FILENAMES_FILE)
+# Load existing passwords and filenames from Object Storage
+file_passwords = load_json_from_object_storage(PASSWORDS_FILE)
+filenames_mapping = load_json_from_object_storage(FILENAMES_FILE)
+
+# Save changes to Object Storage
+def save_file_passwords():
+    save_json_to_object_storage(PASSWORDS_FILE, file_passwords)
+
+def save_filenames_mapping():
+    save_json_to_object_storage(FILENAMES_FILE, filenames_mapping)
+
+# Initialize FastAPI router
+router = APIRouter()
 
 @router.get("/", response_class=HTMLResponse)
 async def get_upload_page(request: Request, error: str = None):
@@ -91,14 +100,14 @@ async def upload_file(files: list[UploadFile] = File(...), password: str = Form(
         # Сохранение пароля, если он указан
         if password:
             file_passwords[random_filename] = password
-            save_json_to_local_file(PASSWORDS_FILE, file_passwords)
+            save_file_passwords()
 
         # Сохранение оригинального имени файла с серверным именем
         filenames_mapping[random_filename] = {
             "name": original_filename,
             "server_name": random_filename
         }
-        save_json_to_local_file(FILENAMES_FILE, filenames_mapping)
+        save_filenames_mapping()
 
     # Перенаправление на главную страницу после загрузки
     return RedirectResponse(url="/", status_code=303)
@@ -125,9 +134,9 @@ async def delete_file(request: Request, filename: str = Form(...), password: str
     file_passwords.pop(random_filename, None)
     filenames_mapping.pop(random_filename, None)
 
-    # Save changes to local storage
-    save_json_to_local_file(PASSWORDS_FILE, file_passwords)
-    save_json_to_local_file(FILENAMES_FILE, filenames_mapping)
+    # Save changes to Object Storage
+    save_file_passwords()
+    save_filenames_mapping()
 
     return RedirectResponse(url="/", status_code=303)
 
@@ -161,20 +170,3 @@ async def download_file(filename: str):
         )
     except oci.exceptions.ServiceError:
         raise HTTPException(status_code=404, detail="File not found")
-
-
-@router.post("/webhook")
-async def github_webhook(request: Request):
-    try:
-        os.chdir('/home/ubuntu/Fildeling')
-        git_url = "https://github.com/Bogdan3000/Fildeling.git"
-
-        # Perform git pull to fetch the latest changes
-        subprocess.run(['git', 'pull', git_url], check=True)
-
-        # Restart the service via systemctl
-        subprocess.run(['systemctl', 'kill', '--signal=SIGTERM', 'bot.service'], check=True)
-
-        return {"message": "Received"}
-    except subprocess.CalledProcessError as e:
-        return {"error": f"Error occurred: {e}"}
