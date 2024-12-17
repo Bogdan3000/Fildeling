@@ -3,6 +3,7 @@ import json
 import shutil
 import subprocess
 import tempfile
+import urllib
 import uuid
 import oci
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException
@@ -67,26 +68,30 @@ async def get_upload_page(request: Request, error: str = None):
 async def upload_file(files: list[UploadFile] = File(...), password: str = Form(None)):
     for file in files:
         original_filename = file.filename
-        random_filename = str(uuid.uuid4())  # Random server filename
+        # Получение расширения файла
+        file_extension = original_filename.split('.')[-1] if '.' in original_filename else ''
+        # Генерация случайного имени с расширением
+        random_filename = f"{uuid.uuid4()}.{file_extension}" if file_extension else str(uuid.uuid4())
 
-        # Upload file to Oracle Object Storage
+        # Загрузка файла в Oracle Object Storage
         file_location = io.BytesIO(await file.read())
         object_storage_client.put_object(namespace, bucket_name, random_filename, file_location)
 
-        # Store the password if provided
+        # Сохранение пароля, если он указан
         if password:
             file_passwords[random_filename] = password
             save_json_to_local_file(PASSWORDS_FILE, file_passwords)
 
-        # Store the original filename mapping along with the server name
+        # Сохранение оригинального имени файла с серверным именем
         filenames_mapping[random_filename] = {
             "name": original_filename,
             "server_name": random_filename
         }
         save_json_to_local_file(FILENAMES_FILE, filenames_mapping)
 
-    # Redirect to the main page after upload
+    # Перенаправление на главную страницу после загрузки
     return RedirectResponse(url="/", status_code=303)
+
 
 @router.post("/deletefile/")
 async def delete_file(request: Request, filename: str = Form(...), password: str = Form(None)):
@@ -115,27 +120,37 @@ async def delete_file(request: Request, filename: str = Form(...), password: str
 
     return RedirectResponse(url="/", status_code=303)
 
+
 @router.get("/download/{filename}")
 async def download_file(filename: str):
-    # Find the random filename by the original filename
+    # Найти случайное имя файла по оригинальному имени
     random_filename = next((k for k, v in filenames_mapping.items() if v["name"] == filename), None)
     if not random_filename:
         raise HTTPException(status_code=404, detail="File not found")
 
-    # Get the file from Oracle Object Storage
+    # Получить файл из Oracle Object Storage
     try:
         object_storage_object = object_storage_client.get_object(namespace, bucket_name, random_filename)
 
-        # Save the file content to a temporary file
+        # Сохранить содержимое файла во временный файл
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             shutil.copyfileobj(io.BytesIO(object_storage_object.data.content), tmp_file)
             tmp_file_path = tmp_file.name
 
-        # Return the file as a response
-        return FileResponse(tmp_file_path, filename=filename,
-                            headers={"Content-Disposition": f"attachment; filename={filename}"})
+        # Кодируем имя файла для корректного отображения русских символов
+        encoded_filename = urllib.parse.quote(filename)
+
+        # Возвращаем файл как ответ
+        return FileResponse(
+            tmp_file_path,
+            filename=filename,
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
+            }
+        )
     except oci.exceptions.ServiceError:
         raise HTTPException(status_code=404, detail="File not found")
+
 
 @router.post("/webhook")
 async def github_webhook(request: Request):
